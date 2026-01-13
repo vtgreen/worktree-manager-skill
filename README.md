@@ -87,3 +87,4 @@ The skill activates automatically when you mention worktrees:
 ## License
 
 MIT
+All credit to github.com:Wirasm
