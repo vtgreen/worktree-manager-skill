@@ -10,10 +10,10 @@ Clone this repo into your Claude skills directory:
 
 ```bash
 # Global installation (available in all projects)
-git clone git@github.com:vtgreen/worktree-manager-skill.git /tmp/wm-skill && cp -r /tmp/wm-skill/.claude/skills/* ~/.claude/skills/worktree-manager/ && rm -rf /tmp/wm-skill
+git clone git@github.com:vtgreen/worktree-manager-skill.git /tmp/wm-skill && mkdir -p ~/.claude/skills/worktree-manager && cp -r /tmp/wm-skill/.claude/skills/* ~/.claude/skills/worktree-manager/ && rm -rf /tmp/wm-skill
 
 # Or project-specific (available only in that project)
-git clone git@github.com:vtgreen/worktree-manager-skill.git /tmp/wm-skill && cp -r /tmp/wm-skill/.claude/skills/* .claude/skills/worktree-manager/ && rm -rf /tmp/wm-skill
+git clone git@github.com:vtgreen/worktree-manager-skill.git /tmp/wm-skill && mkdir -p .claude/skills/worktree-manager && cp -r /tmp/wm-skill/.claude/skills/* .claude/skills/worktree-manager/ && rm -rf /tmp/wm-skill
 ```
 
 Restart Claude Code after installation.
