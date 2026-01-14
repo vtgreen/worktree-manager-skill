@@ -82,9 +82,11 @@ The skill activates automatically when you mention worktrees:
 
 - `jq` — Install with `brew install jq` (macOS) or `apt install jq` (Linux)
 - `git` — For worktree operations
+- `gh` - for pr management 
 - A supported terminal application
 
 ## License
 
 MIT
+
 All credit to github.com:Wirasm
