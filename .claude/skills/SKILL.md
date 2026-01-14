@@ -1,6 +1,6 @@
 ---
 name: worktree-manager
-description: Create, manage, and cleanup git worktrees with Claude Code agents across all projects. USE THIS SKILL when user says "create worktree", "spin up worktrees", "new worktree for X", "worktree status", "cleanup worktrees", "sync worktrees", or wants parallel development branches. Also use when creating PRs from a worktree branch (to update registry with PR number). Handles worktree creation, dependency installation, validation, agent launching in Ghostty, and global registry management.
+description: Create, manage, and cleanup git worktrees with Claude Code agents across all projects. USE THIS SKILL when user says "create worktree", "spin up worktrees", "new worktree for X", "worktree status", "cleanup worktrees", "sync worktrees", or wants parallel development branches. Also use when creating PRs from a worktree branch (to update registry with PR number). Handles worktree creation, dependency installation, validation, agent launching in local terminal, and global registry management.
 ---
 
 # Global Worktree Manager
@@ -45,20 +45,31 @@ All worktrees live in `~/tmp/worktrees/<project-name>/<branch-slug>/`
 ```
 ~/tmp/worktrees/
 ├── obsidian-ai-agent/
-│   ├── feature-auth/           # branch: feature/auth
-│   ├── feature-payments/       # branch: feature/payments
-│   └── fix-login-bug/          # branch: fix/login-bug
+│   ├── feature-auth/           # branch: tn/20261401-feature-auth
+│   ├── feature-payments/       # branch: tn/20261401-feature-payments
+│   └── fix-login-bug/          # branch: tn/20261401-fix-login-bug
 └── another-project/
     └── feature-dark-mode/
 ```
 
 ### Branch Slug Convention
 Branch names are slugified for filesystem safety by replacing `/` with `-`:
-- `feature/auth` → `feature-auth`
-- `fix/login-bug` → `fix-login-bug`
-- `feat/user-profile` → `feat-user-profile`
+- `tn/20261401-featrue-auth` → `tn-20261401-featrue-auth`
+- `tn/20261401-fix-login-bug` → `tn-20261401-fix-login-bug`
+- `tn/20261401-feat-user-profile` → `tn-20261401-feat-user-profile`
 
 **Slugify manually:** `echo "feature/auth" | tr '/' '-'` → `feature-auth`
+
+
+### Branch name convention
+Branch names should always begin with the initials of the respective user, then a forward slash, prefixed with the current date like yyyyddmm, then use kebab case (this-is-kebab-case) for consistency. So if the user provides
+just a name for the branch, such as, "feature add usage api", then it would look like tn/20261401-feature-add-usage-api. If the users initials are not known and not given, then please ask. There should only ever be one forward slash in the branch name spearating the users initials from the branch name.
+Example:
+- `tn/20261401-auth` 
+- `tn/20261401-fix-login-bug`
+- `tn/20261401feat-user-profile`
+
+If user provides a different format for branch name please correct and you should always kebab case everything after the first forward slash
 
 ### Port Allocation Rules
 - **Global pool**: 8100-8199 (100 ports total)
@@ -81,9 +92,9 @@ Branch names are slugified for filesystem safety by replacing `/` with `-`:
       "id": "unique-uuid",
       "project": "obsidian-ai-agent",
       "repoPath": "/Users/rasmus/Projects/obsidian-ai-agent",
-      "branch": "feature/auth",
-      "branchSlug": "feature-auth",
-      "worktreePath": "/Users/rasmus/tmp/worktrees/obsidian-ai-agent/feature-auth",
+      "branch": "tn/20261401-feature-auth",
+      "branchSlug": "tn-20261401-feature-auth",
+      "worktreePath": "/Users/$HOME/tmp/worktrees/obsidian-ai-agent/feature-auth",
       "ports": [8100, 8101],
       "createdAt": "2025-12-04T10:00:00Z",
       "validatedAt": "2025-12-04T10:02:00Z",
@@ -299,7 +310,8 @@ For EACH branch (can run in parallel):
 
 5. INSTALL DEPENDENCIES
    cd $WORKTREE_PATH
-   # Detect and run: npm install / uv sync / etc.
+   # Detect and run: npm install / pdm sync / etc.
+   # look for obviouis config files for clues on what package managers should be used i.e package.json or pyproject.toml
 
 6. VALIDATE (start server, health check, stop)
    a. Start server with allocated port
@@ -347,10 +359,9 @@ If `launch-agent.sh` fails:
 open -na "Ghostty.app" --args -e fish -c "cd '$WORKTREE_PATH' && claude"
 ```
 
-**For iTerm2:**
+**For Terminal:**
 ```bash
-osascript -e 'tell application "iTerm2" to create window with default profile' \
-  -e 'tell application "iTerm2" to tell current session of current window to write text "cd '"$WORKTREE_PATH"' && claude"'
+osascript -e 'tell application "Terminal" to do script "cd '"$WORKTREE_PATH"' && claude"'
 ```
 
 **For tmux:**
@@ -443,28 +454,29 @@ Detect by checking for lockfiles in priority order:
 
 | File | Package Manager | Install Command |
 |------|-----------------|-----------------|
+| `package-lock.json` | npm | `npm install` |
+| `pyproject.toml` | pdm | `pdm sync` |
+| `Cargo.toml` | cargo | `cargo build` |
 | `bun.lockb` | bun | `bun install` |
 | `pnpm-lock.yaml` | pnpm | `pnpm install` |
 | `yarn.lock` | yarn | `yarn install` |
-| `package-lock.json` | npm | `npm install` |
 | `uv.lock` | uv | `uv sync` |
-| `pyproject.toml` (no uv.lock) | uv | `uv sync` |
 | `requirements.txt` | pip | `pip install -r requirements.txt` |
 | `go.mod` | go | `go mod download` |
-| `Cargo.toml` | cargo | `cargo build` |
 
 **Detection logic:**
 ```bash
 cd $WORKTREE_PATH
-if [ -f "bun.lockb" ]; then bun install
+if [ -f "package-lock.json" ]; then npm install
+elif [ -f "pyproject.toml" ]; then pdm sync
+elif [ -f "Cargo.toml" ]; then cargo build
+elif [ -f "bun.lockb" ]; then bun install
 elif [ -f "pnpm-lock.yaml" ]; then pnpm install
 elif [ -f "yarn.lock" ]; then yarn install
-elif [ -f "package-lock.json" ]; then npm install
 elif [ -f "uv.lock" ]; then uv sync
 elif [ -f "pyproject.toml" ]; then uv sync
 elif [ -f "requirements.txt" ]; then pip install -r requirements.txt
 elif [ -f "go.mod" ]; then go mod download
-elif [ -f "Cargo.toml" ]; then cargo build
 fi
 ```
 
@@ -494,7 +506,7 @@ Projects can provide `.claude/worktree.json` for custom settings:
     "count": 2,
     "services": ["api", "frontend"]
   },
-  "install": "uv sync && cd frontend && npm install",
+  "install": "pdm sync && cd frontend && npm install",
   "validate": {
     "start": "docker-compose up -d",
     "healthCheck": "curl -sf http://localhost:{{PORT}}/health",
@@ -623,8 +635,8 @@ Location: `~/.claude/skills/worktree-manager/config.json`
 
 ```json
 {
-  "terminal": "ghostty",
-  "shell": "fish",
+  "terminal": "Terminal",
+  "shell": "zsh",
   "claudeCommand": "claude",
   "portPool": {
     "start": 8100,
@@ -636,7 +648,7 @@ Location: `~/.claude/skills/worktree-manager/config.json`
 }
 ```
 
-**Terminal options**: `ghostty`, `iterm2`, `tmux`, `wezterm`, `kitty`, `alacritty`
+**Terminal options**: `ghostty`, `iterm2`, `tmux`, `wezterm`, `kitty`, `alacritty`, `Terminal`
 
 ---
 
