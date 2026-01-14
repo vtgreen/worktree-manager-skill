@@ -1,5 +1,5 @@
 #!/bin/bash
-# launch-agent.sh - Launch Claude Code in a new Ghostty terminal for a worktree
+# launch-agent.sh - Launch Claude Code in a new terminal (default macos terminal) for a worktree
 #
 # Usage: ./launch-agent.sh <worktree-path> [task-description]
 #
@@ -25,18 +25,14 @@ CONFIG_FILE="$SCRIPT_DIR/../config.json"
 
 # Load config (with defaults)
 if [ -f "$CONFIG_FILE" ] && command -v jq &> /dev/null; then
-    TERMINAL=$(jq -r '.terminal // "ghostty"' "$CONFIG_FILE")
-    SHELL_CMD=$(jq -r '.shell // "fish"' "$CONFIG_FILE")
-    CLAUDE_CMD=$(jq -r '.claudeCommand // "cc"' "$CONFIG_FILE")
+    TERMINAL=$(jq -r '.terminal // "terminal"' "$CONFIG_FILE")
+    SHELL_CMD=$(jq -r '.shell // "zsh"' "$CONFIG_FILE")
+    CLAUDE_CMD=$(jq -r '.claudeCommand // "claude"' "$CONFIG_FILE")
 else
-    TERMINAL="ghostty"
-    SHELL_CMD="fish"
-    CLAUDE_CMD="cc"
+    TERMINAL="terminal"
+    SHELL_CMD="zsh"
+    CLAUDE_CMD="claude"
 fi
-
-# Note: CLAUDE_CMD (default "cc") is configurable in config.json
-# It runs inside the target shell (fish) which should have the alias defined
-# Falls back to "claude" if the alias/command fails
 
 # Expand ~ in path
 WORKTREE_PATH="${WORKTREE_PATH/#\~/$HOME}"
@@ -65,8 +61,6 @@ BRANCH=$(cd "$WORKTREE_PATH" && git branch --show-current 2>/dev/null || basenam
 PROJECT=$(basename "$(dirname "$WORKTREE_PATH")")
 
 # Build the command to run in the new terminal
-# Use configured command (cc) - fish syntax compatible
-# For fish: use 'or' instead of '||' for fallback, and avoid subshells
 if [ "$SHELL_CMD" = "fish" ]; then
     if [ -n "$TASK" ]; then
         INNER_CMD="cd '$WORKTREE_PATH'; and echo '🌳 Worktree: $PROJECT / $BRANCH'; and echo '📋 Task: $TASK'; and echo ''; and $CLAUDE_CMD; or claude"
@@ -89,7 +83,6 @@ case "$TERMINAL" in
             echo "Error: Ghostty not found"
             exit 1
         fi
-        # Launch Ghostty with the command
         open -na "Ghostty.app" --args -e "$SHELL_CMD" -c "$INNER_CMD"
         ;;
 
@@ -98,7 +91,7 @@ case "$TERMINAL" in
 tell application "iTerm2"
     create window with default profile
     tell current session of current window
-        write text "cd '$WORKTREE_PATH' && $CLAUDE_CMD"
+        write text "$INNER_CMD"
     end tell
 end tell
 EOF
@@ -138,9 +131,18 @@ EOF
         alacritty --working-directory "$WORKTREE_PATH" -e "$SHELL_CMD" -c "$INNER_CMD" &
         ;;
 
+    terminal|terminal.app)
+        osascript <<EOF
+tell application "Terminal"
+    do script "$SHELL_CMD -c \"$INNER_CMD\""
+    activate
+end tell
+EOF
+        ;;
+
     *)
         echo "Error: Unknown terminal type: $TERMINAL"
-        echo "Supported: ghostty, iterm2, tmux, wezterm, kitty, alacritty"
+        echo "Supported: terminal, ghostty, iterm2, tmux, wezterm, kitty, alacritty"
         exit 1
         ;;
 esac
